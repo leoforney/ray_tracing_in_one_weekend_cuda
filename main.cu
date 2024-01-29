@@ -1,6 +1,9 @@
 #include <iostream>
 #include <fstream>
 
+#include "vec3.cuh"
+#include "color.cuh"
+
 int main() {
 
     int image_height = 256;
@@ -19,15 +22,8 @@ int main() {
     for (int j = 0; j < image_height; ++j) {
         std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
         for (int i = 0; i < image_width; ++i) {
-            auto r = double(i) / (image_width - 1);
-            auto g = double(j) / (image_height - 1);
-            auto b = 0;
-
-            int ir = static_cast<int>(255.999 * r);
-            int ig = static_cast<int>(255.999 * g);
-            int ib = static_cast<int>(255.999 * b);
-
-            fout << ir << ' ' << ig << ' ' << ib << '\n';
+            auto pixel_color = color(double(i) / (image_width - 1), double(j) / (image_height - 1), 0);
+            write_color(fout, pixel_color);
         }
     }
 

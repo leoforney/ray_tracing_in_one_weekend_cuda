@@ -3,7 +3,9 @@ project(ray_tracing_in_one_weekend_cuda CUDA)
 
 set(CMAKE_CUDA_STANDARD 17)
 
-add_executable(ray_tracing_in_one_weekend_cuda main.cu)
+add_executable(ray_tracing_in_one_weekend_cuda main.cu
+        vec3.cuh
+        color.cuh)
 
 set_target_properties(ray_tracing_in_one_weekend_cuda PROPERTIES
         CUDA_SEPARABLE_COMPILATION ON)
