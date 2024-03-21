@@ -15,7 +15,8 @@ add_executable(ray_tracing_in_one_weekend_cuda main.cu
         hittable_list.h
         rtweekend.h
         interval.h
-        camera.cuh)
+        camera.cuh
+        material.cuh)
 
 set_target_properties(ray_tracing_in_one_weekend_cuda PROPERTIES
         CUDA_SEPARABLE_COMPILATION ON)
