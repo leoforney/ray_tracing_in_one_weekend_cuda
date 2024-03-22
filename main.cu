@@ -11,14 +11,14 @@
 
 __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_camera) {
     if (threadIdx.x == 0 && blockIdx.x == 0) {
-        d_list[0] = new sphere(vec3(0,0,-1), 0.5,
+        d_list[0] = new sphere(vec3(-1,0,-1), -0.4,
+                               new dielectric(1.5));
+        d_list[1] = new sphere(vec3(0,0,-1), 0.5,
                                new lambertian(color(0.8, 0.3, 0.3)));
-        d_list[1] = new sphere(vec3(0,-100.5,-1), 100,
-                               new lambertian(color(0.8, 0.8, 0.0)));
         d_list[2] = new sphere(vec3(1,0,-1), 0.5,
-                               new metal(color(0.8, 0.6, 0.2), 1.0));
-        d_list[3] = new sphere(vec3(-1,0,-1), 0.5,
-                               new metal(color(0.8, 0.8, 0.8), 0.3));
+                               new metal(color(0.8, 0.6, 0.2), 0.1));
+        d_list[3] = new sphere(vec3(0,-100.5,-1), 100,
+                               new lambertian(color(0.8, 0.8, 0.0))); // Ground
         *d_world  = new hittable_list(d_list, 4);
         *d_camera = new camera();
     }
@@ -42,9 +42,9 @@ int main() {
         return 1;
     }
 
-    int numXPixels = 1200;
-    int numYPixels = 600;
-    int numSamples = 100;
+    int numXPixels = 2500;
+    int numYPixels = 1250;
+    int numSamples = 500;
     int tilesX = 8;
     int tilesY = 8;
 
