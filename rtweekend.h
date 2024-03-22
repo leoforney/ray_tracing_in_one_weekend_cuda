@@ -15,26 +15,27 @@ using std::shared_ptr;
 using std::make_shared;
 using std::sqrt;
 
-const double infinity = std::numeric_limits<double>::infinity();
-const double pi = 3.1415926535897932385;
+const float infinity = std::numeric_limits<float>::infinity();
+const float pi = 3.1415926535897932385;
 
-inline double degrees_to_radians(double degrees) {
+inline float degrees_to_radians(float degrees) {
     return degrees * pi / 180.0;
 }
 
-inline double random_double() {
-    static std::uniform_real_distribution<double> distribution(0.0, 1.0);
+inline float random_float() {
+    static std::uniform_real_distribution<float> distribution(0.0, 1.0);
     static std::mt19937 generator;
     return distribution(generator);
 }
 
-inline double random_double(double min, double max) {
-    static std::uniform_real_distribution<double> distribution(min, max);
+inline float random_float(float min, float max) {
+    static std::uniform_real_distribution<float> distribution(min, max);
     static std::mt19937 generator;
     return distribution(generator);
 }
 
 #define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
+
 void check_cuda(cudaError_t result, char const *const func, const char *const file, int const line) {
     if (result) {
         std::cerr << "CUDA error = " << static_cast<unsigned int>(result) << " at " <<

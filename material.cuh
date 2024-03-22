@@ -39,7 +39,7 @@ private:
 
 class metal : public material {
 public:
-    metal(const color& a, double f) : albedo(a), fuzz(f < 1 ? f : 1) {}
+    metal(const color& a, float f) : albedo(a), fuzz(f < 1 ? f : 1) {}
 
     bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered) const override {
         vec3 reflected = reflect(unit_vector(r_in.direction()), rec.normal);
@@ -49,7 +49,7 @@ public:
     }
 private:
     color albedo;
-    double fuzz;
+    float fuzz;
 };
 
 #endif //RAY_TRACING_IN_ONE_WEEKEND_CUDA_MATERIAL_CUH

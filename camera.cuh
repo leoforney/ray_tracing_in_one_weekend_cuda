@@ -16,7 +16,7 @@
 
 class camera {
 public:
-    double aspect_ratio = 1.0;
+    float aspect_ratio = 1.0;
     int image_width = 100;
     int samples_per_pixel = 10;
     int max_depth = 10;
@@ -60,7 +60,7 @@ private:
 
         auto focal_length = 1.0;
         auto viewport_height = 2.0;
-        auto viewport_width = viewport_height * (static_cast<double>(image_width)/image_height);
+        auto viewport_width = viewport_height * (static_cast<float>(image_width)/image_height);
 
         auto viewport_u = vec3(viewport_width, 0, 0);
         auto viewport_v = vec3(0, -viewport_height, 0);
@@ -84,8 +84,8 @@ private:
     }
 
     vec3 pixel_sample_square() const {
-        auto px = -0.5 + random_double();
-        auto py = -0.5 + random_double();
+        auto px = -0.5 + random_float();
+        auto py = -0.5 + random_float();
         return (px * pixel_delta_u) + (py * pixel_delta_v);
     };
 
