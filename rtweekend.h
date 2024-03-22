@@ -10,18 +10,18 @@
 #include <memory>
 #include <cstdlib>
 #include <random>
+#include <cfloat>
 
-using std::shared_ptr;
-using std::make_shared;
 using std::sqrt;
 
-const float infinity = std::numeric_limits<float>::infinity();
+const float infinity = INFINITY;
 const float pi = 3.1415926535897932385;
 
 inline float degrees_to_radians(float degrees) {
     return degrees * pi / 180.0;
 }
 
+/*
 inline float random_float() {
     static std::uniform_real_distribution<float> distribution(0.0, 1.0);
     static std::mt19937 generator;
@@ -33,6 +33,7 @@ inline float random_float(float min, float max) {
     static std::mt19937 generator;
     return distribution(generator);
 }
+*/
 
 #define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
 
@@ -45,6 +46,8 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
         exit(99);
     }
 }
+
+#define RANDVEC3 vec3(curand_uniform(local_rand_state),curand_uniform(local_rand_state),curand_uniform(local_rand_state))
 
 #include "interval.h"
 #include "ray.cuh"
