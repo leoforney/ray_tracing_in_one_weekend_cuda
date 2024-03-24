@@ -17,23 +17,9 @@ using std::sqrt;
 const float infinity = INFINITY;
 const float pi = 3.1415926535897932385;
 
-inline float degrees_to_radians(float degrees) {
+__device__ inline float degrees_to_radians(float degrees) {
     return degrees * pi / 180.0;
 }
-
-/*
-inline float random_float() {
-    static std::uniform_real_distribution<float> distribution(0.0, 1.0);
-    static std::mt19937 generator;
-    return distribution(generator);
-}
-
-inline float random_float(float min, float max) {
-    static std::uniform_real_distribution<float> distribution(min, max);
-    static std::mt19937 generator;
-    return distribution(generator);
-}
-*/
 
 #define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
 

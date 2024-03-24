@@ -9,7 +9,7 @@
 #include "camera.cuh"
 #include "material.cuh"
 
-__global__ void create_world(hittable **d_list, hittable **d_world, camera **d_camera) {
+__global__ void create_world(hittable **d_list, hittable **d_world, camera **d_camera, int numXPixels, int numYPixels) {
     if (threadIdx.x == 0 && blockIdx.x == 0) {
         d_list[0] = new sphere(vec3(-1,0,-1), -0.4,
                                new dielectric(1.5));
@@ -20,7 +20,8 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
         d_list[3] = new sphere(vec3(0,-100.5,-1), 100,
                                new lambertian(color(0.8, 0.8, 0.0))); // Ground
         *d_world  = new hittable_list(d_list, 4);
-        *d_camera = new camera();
+        *d_camera = new camera(point3(-2,2,1), point3(0,0,-1), vec3(0,1,0),
+                               20.0, float(numXPixels) / float(numYPixels));
     }
 }
 
@@ -44,7 +45,7 @@ int main() {
 
     int numXPixels = 2500;
     int numYPixels = 1250;
-    int numSamples = 500;
+    int numSamples = 1000;
     int tilesX = 8;
     int tilesY = 8;
 
@@ -66,7 +67,7 @@ int main() {
     checkCudaErrors(cudaMalloc((void **)&d_world, sizeof(hittable *)));
     camera **d_camera;
     checkCudaErrors(cudaMalloc((void **)&d_camera, sizeof(camera *)));
-    create_world<<<1,1>>>(d_list,d_world,d_camera);
+    create_world<<<1,1>>>(d_list, d_world, d_camera, numXPixels, numYPixels);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
 
