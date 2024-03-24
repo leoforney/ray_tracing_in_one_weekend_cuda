@@ -16,9 +16,10 @@ using std::sqrt;
 
 const float infinity = INFINITY;
 const float pi = 3.1415926535897932385;
+const float moveSpeed = 0.005;
 
 __device__ inline float degrees_to_radians(float degrees) {
-    return degrees * pi / 180.0;
+    return degrees * pi / 180.0f;
 }
 
 #define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )

@@ -19,24 +19,40 @@
 class camera {
 public:
     __device__ camera(vec3 lookfrom, vec3 lookat, vec3 vup, float vfov, float aspect) {
-        vec3 u, v, w;
-        float theta = vfov * M_PI/180;
-        float half_height = tan(theta/2);
-        float half_width = aspect * half_height;
         origin = lookfrom;
-        w = unit_vector(lookfrom - lookat);
-        u = unit_vector(cross(vup, w));
-        v = cross(w, u);
-        lower_left_corner = origin - half_width*u -half_height*v - w;
-        horizontal = 2*half_width*u;
-        vertical = 2*half_height*v;
+        target = lookat;
+        view_up = vup;
+        aspect_ratio = aspect;
+        fov = vfov;
+        float dist_to_focus = (lookfrom-lookat).length();
+        float aperture = 2.0;
+        update_params();
     }
-    __device__ ray get_ray(float u, float v) { return ray(origin, lower_left_corner + u*horizontal + v*vertical - origin); }
+    __device__ ray get_ray(float u, float v, curandState *local_rand_state) { return ray(origin, lower_left_corner + u*horizontal + v*vertical - origin); }
 
     vec3 origin;
+    vec3 target;
+    vec3 view_up;
     vec3 lower_left_corner;
     vec3 horizontal;
+    vec3 u, v, w;
     vec3 vertical;
+
+    float fov;
+    float aspect_ratio;
+    float lens_radius;
+
+    __device__ void update_params() {
+        float theta = degrees_to_radians(fov);
+        float half_height = tan(theta / 2);
+        float half_width = aspect_ratio * half_height;
+        w = unit_vector(origin - target);
+        u = unit_vector(cross(view_up, w));
+        v = cross(w, u);
+        lower_left_corner = origin - half_width * u -half_height * v - w;
+        horizontal = 2.0f * half_width * u;
+        vertical = 2.0f * half_height * v;
+    }
 
     __device__ static vec3 ray_color(const ray& r, hittable **world, curandState *local_rand_state) {
         ray cur_ray = r;
@@ -84,7 +100,7 @@ __global__ static void render(vec3 *fb, int max_x, int max_y, int numSamples, ca
     for(int s = 0; s < numSamples; s++) {
         float u = float(i + curand_uniform(&local_rand_state)) / float(max_x);
         float v = float(j + curand_uniform(&local_rand_state)) / float(max_y);
-        ray r = (*cam)->get_ray(u,v);
+        ray r = (*cam)->get_ray(u, v, &local_rand_state);
         col += camera::ray_color(r, world, &local_rand_state);
     }
 

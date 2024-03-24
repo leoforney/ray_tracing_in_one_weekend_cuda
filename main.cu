@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <SDL.h>
 
 #include "rtweekend.h"
 
@@ -20,7 +21,7 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
         d_list[3] = new sphere(vec3(0,-100.5,-1), 100,
                                new lambertian(color(0.8, 0.8, 0.0))); // Ground
         *d_world  = new hittable_list(d_list, 4);
-        *d_camera = new camera(point3(-2,2,1), point3(0,0,-1), vec3(0,1,0),
+        *d_camera = new camera(point3(3,3,2), point3(0,0,-1), vec3(0,1,0),
                                20.0, float(numXPixels) / float(numYPixels));
     }
 }
@@ -34,6 +35,24 @@ __global__ void free_world(hittable **d_list, hittable **d_world, camera **d_cam
     delete *d_camera;
 }
 
+__global__ void update_camera_position(bool w, bool a, bool s, bool d, camera **d_camera) {
+    vec3 forwardDirection = normalize((*d_camera)->target - (*d_camera)->origin);
+    vec3 rightDirection = normalize(cross(forwardDirection, (*d_camera)->view_up));
+    if (w) {
+        (*d_camera)->origin += forwardDirection * -moveSpeed;
+        (*d_camera)->target += forwardDirection * -moveSpeed;
+    } else if (s) {
+        (*d_camera)->origin += forwardDirection * moveSpeed;
+        (*d_camera)->target += forwardDirection * moveSpeed;
+    } else if (a) {
+        (*d_camera)->origin += rightDirection * moveSpeed;
+        (*d_camera)->target += rightDirection * moveSpeed;
+    } else if (d) {
+        (*d_camera)->origin += rightDirection * -moveSpeed;
+        (*d_camera)->target += rightDirection * -moveSpeed;
+    }
+}
+
 int main() {
     std::ofstream fout;
     fout.open("image.ppm");
@@ -43,9 +62,9 @@ int main() {
         return 1;
     }
 
-    int numXPixels = 2500;
-    int numYPixels = 1250;
-    int numSamples = 1000;
+    int numXPixels = 1200;
+    int numYPixels = 600;
+    int numSamples = 50;
     int tilesX = 8;
     int tilesY = 8;
 
@@ -76,7 +95,8 @@ int main() {
     render_init<<<blocks, threads>>>(numXPixels, numYPixels, d_rand_state);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
-    render<<<blocks, threads>>>(fb, numXPixels, numYPixels, numSamples, d_camera, d_world, d_rand_state);
+    // We render a super high quality one so we can save the image
+    render<<<blocks, threads>>>(fb, numXPixels, numYPixels, 1000, d_camera, d_world, d_rand_state);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
 
@@ -87,6 +107,72 @@ int main() {
             write_color(fout, fb[pixel_index]);
         }
     }
+
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+        std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
+        return -1;
+    }
+
+    SDL_Window* window = SDL_CreateWindow("CUDA Ray Tracing", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, numXPixels, numYPixels, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
+    if (!window) {
+        std::cerr << "Window could not be created! SDL_Error: " << SDL_GetError() << std::endl;
+        return -1;
+    }
+
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, numXPixels, numYPixels);
+
+    SDL_WarpMouseInWindow(window, numXPixels / 2, numYPixels / 2);
+
+    SDL_ShowCursor(SDL_DISABLE);
+    bool quit = false;
+    SDL_Event e;
+    int mouseXDelta, mouseYDelta;
+
+    while (!quit) {
+        while (SDL_PollEvent(&e) != 0) {
+            if (e.type == SDL_QUIT) {
+                quit = true;
+            }
+
+            if (e.type == SDL_KEYDOWN) {
+                switch (e.key.keysym.sym) {
+                    case SDLK_w:
+                        update_camera_position<<<1, 1>>>(true, false, false, false, d_camera);
+                        break;
+                    case SDLK_s:
+                        update_camera_position<<<1, 1>>>(false, false, true, false, d_camera);
+                        break;
+                    case SDLK_a:
+                        update_camera_position<<<1, 1>>>(false, true, false, false, d_camera);
+                        break;
+                    case SDLK_d:
+                        update_camera_position<<<1, 1>>>(false, false, false, true, d_camera);
+                        break;
+                }
+            }
+        }
+
+        SDL_GetRelativeMouseState(&mouseXDelta, &mouseYDelta);
+
+        updateTextureFromFrameBuffer(texture, fb, numXPixels, numYPixels);
+
+        SDL_RenderClear(renderer);
+        SDL_RenderCopy(renderer, texture, NULL, NULL);
+
+        SDL_RenderPresent(renderer);
+
+        render<<<blocks, threads>>>(fb, numXPixels, numYPixels, numSamples, d_camera, d_world, d_rand_state);
+        checkCudaErrors(cudaGetLastError());
+        checkCudaErrors(cudaDeviceSynchronize());
+    }
+
+    std::cout << "Cleaning up" << std::endl;
+
+    SDL_DestroyTexture(texture);
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
 
     checkCudaErrors(cudaDeviceSynchronize());
     free_world<<<1,1>>>(d_list,d_world,d_camera);

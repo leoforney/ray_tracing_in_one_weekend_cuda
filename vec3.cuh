@@ -117,6 +117,12 @@ __host__ __device__ inline vec3 cross(const vec3 &u, const vec3 &v) {
                 u.e[0] * v.e[1] - u.e[1] * v.e[0]);
 }
 
+__host__ __device__ inline vec3 normalize(const vec3 &v) {
+    float len = v.length();
+    float invLen = 1.0f / len;
+    return vec3(v.e[0] * invLen, v.e[1] * invLen, v.e[2] * invLen);
+}
+
 __host__ __device__ inline vec3 unit_vector(vec3 v) {
     return v / v.length();
 }
@@ -126,6 +132,14 @@ __device__ vec3 random_in_unit_sphere(curandState *local_rand_state) {
     do {
         p = 2.0f * RANDVEC3 - vec3(1,1,1);
     } while (p.length_squared() >= 1.0f);
+    return p;
+}
+
+__device__ vec3 random_in_unit_disk(curandState *local_rand_state) {
+    vec3 p;
+    do {
+        p = 2.0f * vec3(curand_uniform(local_rand_state),curand_uniform(local_rand_state),0) - vec3(1,1,0);
+    } while (dot(p,p) >= 1.0f);
     return p;
 }
 
