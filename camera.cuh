@@ -81,36 +81,56 @@ public:
     }
 };
 
-__global__ static void render_init(int max_x, int max_y, curandState *rand_state) {
+__global__ void render_init(int max_x, int max_y, int numSamples, curandState *rand_state) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     int j = threadIdx.y + blockIdx.y * blockDim.y;
-    if((i >= max_x) || (j >= max_y)) return;
+    int sampleIndex = threadIdx.z;
+
+    if (i >= max_x || j >= max_y || sampleIndex >= numSamples) return;
+
     int pixel_index = j * max_x + i;
-    curand_init(1984, pixel_index, 0, &rand_state[pixel_index]);
+
+    curand_init(2024 + pixel_index, pixel_index, sampleIndex, &rand_state[pixel_index]);
 }
 
-__global__ static void render(vec3 *fb, int max_x, int max_y, int numSamples, camera **cam, hittable **world, curandState *rand_state) {
+__global__ void render(vec3 *sample_buffer, int max_x, int max_y, int numSamples, camera **cam, hittable **world, curandState *rand_state) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     int j = threadIdx.y + blockIdx.y * blockDim.y;
-    if((i >= max_x) || (j >= max_y)) return;
+    int sample_index = threadIdx.z;
+    if(i >= max_x || j >= max_y || sample_index >= numSamples) return;
+
     int pixel_index = j * max_x + i;
     curandState local_rand_state = rand_state[pixel_index];
-    color col(0,0,0);
 
-    for(int s = 0; s < numSamples; s++) {
-        float u = float(i + curand_uniform(&local_rand_state)) / float(max_x);
-        float v = float(j + curand_uniform(&local_rand_state)) / float(max_y);
-        ray r = (*cam)->get_ray(u, v, &local_rand_state);
-        col += camera::ray_color(r, world, &local_rand_state);
+    float u = float(i + curand_uniform(&local_rand_state)) / float(max_x);
+    float v = float(j + curand_uniform(&local_rand_state)) / float(max_y);
+    ray r = (*cam)->get_ray(u, v, &local_rand_state);
+    color col = camera::ray_color(r, world, &local_rand_state);
+
+    int sample_buffer_index = pixel_index * numSamples + sample_index;
+    sample_buffer[sample_buffer_index] += col;
+}
+
+__global__ void aggregate_samples(vec3 *fb, int max_x, int max_y, int numSamples, vec3 *sample_buffer) {
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    if (i >= max_x || j >= max_y) return;
+
+    int pixel_index = j * max_x + i;
+    color sum(0, 0, 0);
+
+    for(int s = 0; s < numSamples; ++s) {
+        int sampleIndex = pixel_index * numSamples + s;
+        sum += sample_buffer[sampleIndex];
     }
 
-    rand_state[pixel_index] = local_rand_state;
+    sum /= numSamples;
+    sum[0] = linear_to_gamma(sum[0]);
+    sum[1] = linear_to_gamma(sum[1]);
+    sum[2] = linear_to_gamma(sum[2]);
 
-    col /= float(numSamples);
-    col[0] = linear_to_gamma(col[0]);
-    col[1] = linear_to_gamma(col[1]);
-    col[2] = linear_to_gamma(col[2]);
-    fb[pixel_index] = col;
+    fb[pixel_index] = sum;
 }
+
 
 #endif //RAY_TRACING_IN_ONE_WEEKEND_CUDA_CAMERA_CUH

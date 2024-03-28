@@ -13,7 +13,7 @@
 class sphere: public hittable {
 public:
     __device__ sphere() {}
-    __device__ sphere(point3 _center, float _radius, material *_material)
+    __host__ __device__ sphere(point3 _center, float _radius, material *_material)
     : center(_center), radius(_radius), mat(_material) {}
 
     __device__ bool hit(const ray& r, interval ray_t, hit_record& rec) const override {

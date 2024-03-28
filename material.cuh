@@ -18,7 +18,7 @@ public:
 
 class lambertian : public material {
 public:
-    __device__ lambertian(const color& a) : albedo(a) {}
+    __host__ __device__ lambertian(const color& a) : albedo(a) {}
 
     __device__ bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered, curandState *local_rand_state) const override {
         auto scatter_direction = rec.normal + random_in_unit_sphere(local_rand_state);
@@ -36,7 +36,7 @@ public:
 
 class metal : public material {
 public:
-    __device__ metal(const color& a, float f) : albedo(a), fuzz(f < 1 ? f : 1) {}
+    __host__ __device__ metal(const color& a, float f) : albedo(a), fuzz(f < 1 ? f : 1) {}
 
     __device__ bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered, curandState *local_rand_state) const override {
         vec3 reflected = reflect(unit_vector(r_in.direction()), rec.normal);
@@ -50,7 +50,7 @@ public:
 
 class dielectric : public material {
 public:
-    __device__ dielectric(float index_of_reflection) : ir(index_of_reflection) {}
+    __host__ __device__ dielectric(float index_of_reflection) : ir(index_of_reflection) {}
 
     __device__ bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered, curandState *local_rand_state) const override {
         attenuation = color(1.0, 1.0, 1.0);

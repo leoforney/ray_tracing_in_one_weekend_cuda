@@ -10,24 +10,59 @@
 #include "camera.cuh"
 #include "material.cuh"
 
-__global__ void create_world(hittable **d_list, hittable **d_world, camera **d_camera, int numXPixels, int numYPixels) {
+__global__ void create_world(hittable **d_list, hittable **d_world, camera **d_camera, int numXPixels, int numYPixels, curandState *init_rand_state) {
     if (threadIdx.x == 0 && blockIdx.x == 0) {
-        d_list[0] = new sphere(vec3(-1,0,-1), -0.4,
-                               new dielectric(1.5));
-        d_list[1] = new sphere(vec3(0,0,-1), 0.5,
-                               new lambertian(color(0.8, 0.3, 0.3)));
-        d_list[2] = new sphere(vec3(1,0,-1), 0.5,
-                               new metal(color(0.8, 0.6, 0.2), 0.1));
-        d_list[3] = new sphere(vec3(0,-100.5,-1), 100,
-                               new lambertian(color(0.8, 0.8, 0.0))); // Ground
-        *d_world  = new hittable_list(d_list, 4);
-        *d_camera = new camera(point3(3,3,2), point3(0,0,-1), vec3(0,1,0),
+        auto material1 = new dielectric(1.5);
+        d_list[0] = new sphere(point3(0, 1, 0), 1.0, material1);
+
+        auto material2 = new lambertian(color(0.4, 0.2, 0.1));
+        d_list[1] = new sphere(point3(-4, 1, 0), 1.0, material2);
+
+        auto material3 = new metal(color(0.7, 0.6, 0.5), 0.0);
+        d_list[2] = new sphere(point3(4, 1, 0), 1.0, material3);
+
+        d_list[3] = new sphere(vec3(0,-1000,-0), 1000,new lambertian(color(0.5, 0.5, 0.5))); // Ground
+        int index = 4;
+        
+        curand_init(2024, 0, 0, init_rand_state);
+
+        for (int a = -11; a < 11; a++) {
+            for (int b = -11; b < 11; b++) {
+                auto choose_mat = curand_uniform(init_rand_state);
+                point3 center(a + 0.9 * curand_uniform(init_rand_state), 0.2, b + 0.9 * curand_uniform(init_rand_state));
+
+                if ((center - point3(4, 0.2, 0)).length() > 0.9) {
+                    material *sphere_material;
+
+                    if (choose_mat < 0.8) {
+                        // diffuse
+                        auto albedo = color(curand_uniform(init_rand_state), curand_uniform(init_rand_state), curand_uniform(init_rand_state)) * color(curand_uniform(init_rand_state), curand_uniform(init_rand_state), curand_uniform(init_rand_state));
+                        sphere_material = new lambertian(albedo);
+                        d_list[index] = new sphere(center, 0.2, sphere_material);
+                    } else if (choose_mat < 0.950) {
+                        // metal
+                        auto albedo = color(curand_uniform(init_rand_state) / 2 + 0.5, curand_uniform(init_rand_state) / 2 + 0.5, curand_uniform(init_rand_state) / 2 + 0.5);
+                        auto fuzz = curand_uniform(init_rand_state) / 2;
+                        sphere_material = new metal(albedo, fuzz);
+                        d_list[index] = new sphere(center, 0.2, sphere_material);
+                    } else {
+                        // glass
+                        sphere_material = new dielectric(1.5);
+                        d_list[index] = new sphere(center, 0.2, sphere_material);
+                    }
+                    index++;
+                }
+            }
+        }
+
+        *d_world  = new hittable_list(d_list, 485);
+        *d_camera = new camera(point3(13,2,3), point3(0,0,0), vec3(0,1,0),
                                20.0, float(numXPixels) / float(numYPixels));
     }
 }
 
 __global__ void free_world(hittable **d_list, hittable **d_world, camera **d_camera) {
-    for(int i=0; i < 4; i++) {
+    for(int i=0; i < 485; i++) {
         delete ((sphere *)d_list[i])->mat;
         delete d_list[i];
     }
@@ -64,9 +99,15 @@ int main() {
 
     int numXPixels = 1200;
     int numYPixels = 600;
-    int numSamples = 50;
+    int numSamples = 100;
     int tilesX = 8;
     int tilesY = 8;
+
+/*    cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, 0);
+    int maxThreadsPerBlock = deviceProp.maxThreadsPerBlock;*/ // TODO: Implement the correct method to get max threads for z
+
+    int maxZ = 10;
 
     std::cerr << "Rendering a " << numXPixels << "x" << numYPixels << " image with " << numSamples << " samples per pixel ";
     std::cerr << "in " << tilesX << "x" << tilesY << " blocks.\n";
@@ -76,27 +117,39 @@ int main() {
 
     vec3 *fb;
     checkCudaErrors(cudaMallocManaged((void **)&fb, fb_size));
+    vec3 *sample_buffer;
+    checkCudaErrors(cudaMallocManaged((void **)&sample_buffer, fb_size * numSamples));
 
     curandState *d_rand_state;
-    checkCudaErrors(cudaMalloc((void **)&d_rand_state, num_pixels*sizeof(curandState)));
+    checkCudaErrors(cudaMalloc((void **)&d_rand_state, num_pixels * sizeof(curandState)));
+    
+    curandState *d_rand_state_init;
+    checkCudaErrors(cudaMalloc((void **)&d_rand_state_init, sizeof(curandState)));
 
     hittable **d_list;
-    checkCudaErrors(cudaMalloc((void **)&d_list, 4*sizeof(hittable *)));
+    checkCudaErrors(cudaMalloc((void **)&d_list, 485*sizeof(hittable *)));
     hittable **d_world;
     checkCudaErrors(cudaMalloc((void **)&d_world, sizeof(hittable *)));
     camera **d_camera;
     checkCudaErrors(cudaMalloc((void **)&d_camera, sizeof(camera *)));
-    create_world<<<1,1>>>(d_list, d_world, d_camera, numXPixels, numYPixels);
+    create_world<<<1,1>>>(d_list, d_world, d_camera, numXPixels, numYPixels, d_rand_state_init);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
 
     dim3 blocks(numXPixels / tilesX + 1, numYPixels / tilesY + 1);
-    dim3 threads(tilesX, tilesY);
-    render_init<<<blocks, threads>>>(numXPixels, numYPixels, d_rand_state);
+    dim3 threads(tilesX, tilesY, maxZ);
+
+    render_init<<<blocks, threads>>>(numXPixels, numYPixels, numSamples, d_rand_state);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
-    // We render a super high quality one so we can save the image
-    render<<<blocks, threads>>>(fb, numXPixels, numYPixels, 1000, d_camera, d_world, d_rand_state);
+
+    for (int i = 0; i < numSamples / maxZ; i++) {
+        render<<<blocks, threads>>>(sample_buffer, numXPixels, numYPixels, numSamples, d_camera, d_world, d_rand_state);
+    }
+    checkCudaErrors(cudaGetLastError());
+    checkCudaErrors(cudaDeviceSynchronize());
+
+    aggregate_samples<<<blocks, threads>>>(fb, numXPixels, numYPixels, numSamples, sample_buffer);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
 
@@ -108,7 +161,7 @@ int main() {
         }
     }
 
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+    /*if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
         return -1;
     }
@@ -172,7 +225,7 @@ int main() {
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
-    SDL_Quit();
+    SDL_Quit();*/
 
     checkCudaErrors(cudaDeviceSynchronize());
     free_world<<<1,1>>>(d_list,d_world,d_camera);
@@ -181,6 +234,7 @@ int main() {
     checkCudaErrors(cudaFree(d_world));
     checkCudaErrors(cudaFree(d_list));
     checkCudaErrors(cudaFree(d_rand_state));
+    checkCudaErrors(cudaFree(d_rand_state_init));
     checkCudaErrors(cudaFree(fb));
 
     cudaDeviceReset();

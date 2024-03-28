@@ -22,6 +22,18 @@ __device__ inline float degrees_to_radians(float degrees) {
     return degrees * pi / 180.0f;
 }
 
+float host_random_float() {
+    static std::default_random_engine e;
+    static std::uniform_real_distribution<> dis(0, 1); // range [0, 1)
+    return dis(e);
+}
+
+float host_random_float(float min, float max) {
+    static std::default_random_engine e;
+    static std::uniform_real_distribution<> dis(0, 1); // range [0, 1)
+    return dis(e);
+}
+
 #define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
 
 void check_cuda(cudaError_t result, char const *const func, const char *const file, int const line) {
