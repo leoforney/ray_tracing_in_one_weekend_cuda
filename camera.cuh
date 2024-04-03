@@ -28,7 +28,9 @@ public:
         float aperture = 2.0;
         update_params();
     }
-    __device__ ray get_ray(float u, float v, curandState *local_rand_state) { return ray(origin, lower_left_corner + u*horizontal + v*vertical - origin); }
+    __device__ ray get_ray(float u, float v, curandState *local_rand_state) {
+        return ray(origin, lower_left_corner + u*horizontal + v*vertical - origin);
+    }
 
     vec3 origin;
     vec3 target;
@@ -89,7 +91,7 @@ __global__ static void render_init(int max_x, int max_y, curandState *rand_state
     curand_init(1984, pixel_index, 0, &rand_state[pixel_index]);
 }
 
-__global__ static void render(vec3 *fb, int max_x, int max_y, int numSamples, camera **cam, hittable **world, curandState *rand_state) {
+__global__ static void render(vec3 *fb, int max_x, int max_y, int numRays, camera **cam, hittable **world, curandState *rand_state) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     int j = threadIdx.y + blockIdx.y * blockDim.y;
     if((i >= max_x) || (j >= max_y)) return;
@@ -97,16 +99,28 @@ __global__ static void render(vec3 *fb, int max_x, int max_y, int numSamples, ca
     curandState local_rand_state = rand_state[pixel_index];
     color col(0,0,0);
 
-    for(int s = 0; s < numSamples; s++) {
+    for(int s = 0; s < numRays; s++) {
         float u = float(i + curand_uniform(&local_rand_state)) / float(max_x);
         float v = float(j + curand_uniform(&local_rand_state)) / float(max_y);
         ray r = (*cam)->get_ray(u, v, &local_rand_state);
         col += camera::ray_color(r, world, &local_rand_state);
     }
 
-    rand_state[pixel_index] = local_rand_state;
+    fb[pixel_index] = col;
 
-    col /= float(numSamples);
+    rand_state[pixel_index] = local_rand_state;
+}
+
+__global__ static void accumulate_samples(color *fb, int max_x, int max_y, int numRays) {
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    if((i >= max_x) || (j >= max_y)) return;
+
+    int pixel_index = j * max_x + i;
+
+    color col = fb[pixel_index];
+
+    col /= float(numRays);
     col[0] = linear_to_gamma(col[0]);
     col[1] = linear_to_gamma(col[1]);
     col[2] = linear_to_gamma(col[2]);
