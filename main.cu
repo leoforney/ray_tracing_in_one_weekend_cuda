@@ -1,6 +1,6 @@
 #include <iostream>
 #include <fstream>
-#include <SDL.h>
+//#include <SDL.h>
 
 #include "rtweekend.h"
 
@@ -98,11 +98,12 @@ int main() {
         return 1;
     }
 
-    int numXPixels = 1200;
-    int numYPixels = 600;
-    int numRays = 50;
-    int tilesX = 2;
-    int tilesY = 2;
+    const int numXPixels = 1200;
+    const int numYPixels = 600;
+    const int numRays = 8;
+    const int tilesX = 8;
+    const int tilesY = 8;
+    const int tilesZ = 8;
 
     std::cerr << "Rendering a " << numXPixels << "x" << numYPixels << " image with " << numRays << " ray samples per pixel ";
     std::cerr << "in " << tilesX << "x" << tilesY << " blocks.\n";
@@ -114,7 +115,7 @@ int main() {
     checkCudaErrors(cudaMallocManaged((void **)&fb, fb_size));
 
     curandState *d_rand_state;
-    checkCudaErrors(cudaMalloc((void **)&d_rand_state, num_pixels*sizeof(curandState)));
+    checkCudaErrors(cudaMalloc((void **)&d_rand_state, num_pixels * numRays * sizeof(curandState)));
 
     curandState *d_rand_state_init;
     checkCudaErrors(cudaMalloc((void **)&d_rand_state_init, sizeof(curandState)));
@@ -129,9 +130,9 @@ int main() {
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
 
-    dim3 blocks(numXPixels / tilesX + 1, numYPixels / tilesY + 1);
-    dim3 threads(tilesX, tilesY);
-    render_init<<<blocks, threads>>>(numXPixels, numYPixels, d_rand_state);
+    dim3 blocks(numXPixels / tilesX + 1, numYPixels / tilesY + 1, numRays / tilesZ + 1);
+    dim3 threads(tilesX, tilesY, tilesZ);
+    render_init<<<blocks, threads>>>(numXPixels, numYPixels, numRays, d_rand_state);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
 

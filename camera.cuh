@@ -83,32 +83,39 @@ public:
     }
 };
 
-__global__ static void render_init(int max_x, int max_y, curandState *rand_state) {
+__global__ void render_init(int max_x, int max_y, int numRays, curandState *rand_state) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     int j = threadIdx.y + blockIdx.y * blockDim.y;
-    if((i >= max_x) || (j >= max_y)) return;
+    if ((i >= max_x) || (j >= max_y)) return;
+
     int pixel_index = j * max_x + i;
-    curand_init(1984, pixel_index, 0, &rand_state[pixel_index]);
+    for (int s = 0; s < numRays; ++s) {
+        int ray_index = pixel_index * numRays + s;
+        curand_init(1984 + s, pixel_index, 0, &rand_state[ray_index]);
+    }
 }
 
 __global__ static void render(vec3 *fb, int max_x, int max_y, int numRays, camera **cam, hittable **world, curandState *rand_state) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     int j = threadIdx.y + blockIdx.y * blockDim.y;
-    if((i >= max_x) || (j >= max_y)) return;
+    int rayIndex = threadIdx.z + blockIdx.z * blockDim.z;
+
+    if ((i >= max_x) || (j >= max_y) || (rayIndex >= numRays)) return;
+
     int pixel_index = j * max_x + i;
-    curandState local_rand_state = rand_state[pixel_index];
-    color col(0,0,0);
+    int state_index = pixel_index * numRays + rayIndex;
 
-    for(int s = 0; s < numRays; s++) {
-        float u = float(i + curand_uniform(&local_rand_state)) / float(max_x);
-        float v = float(j + curand_uniform(&local_rand_state)) / float(max_y);
-        ray r = (*cam)->get_ray(u, v, &local_rand_state);
-        col += camera::ray_color(r, world, &local_rand_state);
-    }
+    curandState local_rand_state = rand_state[state_index];
+    color col(0.0, 0.0, 0.0);
 
-    fb[pixel_index] = col;
+    float u = float(i + curand_uniform(&local_rand_state)) / float(max_x);
+    float v = float(j + curand_uniform(&local_rand_state)) / float(max_y);
+    ray r = (*cam)->get_ray(u, v, &local_rand_state);
+    col = camera::ray_color(r, world, &local_rand_state);
 
-    rand_state[pixel_index] = local_rand_state;
+    atomicAdd(&(fb[pixel_index].e[0]), col.r() / float(numRays));
+    atomicAdd(&(fb[pixel_index].e[1]), col.g() / float(numRays));
+    atomicAdd(&(fb[pixel_index].e[2]), col.b() / float(numRays));
 }
 
 __global__ static void accumulate_samples(color *fb, int max_x, int max_y, int numRays) {
@@ -120,7 +127,6 @@ __global__ static void accumulate_samples(color *fb, int max_x, int max_y, int n
 
     color col = fb[pixel_index];
 
-    col /= float(numRays);
     col[0] = linear_to_gamma(col[0]);
     col[1] = linear_to_gamma(col[1]);
     col[2] = linear_to_gamma(col[2]);

@@ -26,7 +26,7 @@ void write_color(std::ostream &out, color pixel_color) {
         << static_cast<int>(256 * intensity.clamp(b)) << '\n';
 }
 
-Uint32 convertColorToUint32(const vec3& color) {
+/*Uint32 convertColorToUint32(const vec3& color) {
     static const interval intensity(0.000, 0.999);
     Uint8 r = static_cast<int>(256 * intensity.clamp(color.r()));
     Uint8 g = static_cast<int>(256 * intensity.clamp(color.g()));
@@ -45,6 +45,6 @@ void updateTextureFromFrameBuffer(SDL_Texture *texture, color *fb, const unsigne
 
     SDL_UpdateTexture(texture, NULL, pixels, numXPixels * sizeof(Uint32));
     delete[] pixels;
-}
+}*/
 
 #endif //RAY_TRACING_IN_ONE_WEEKEND_CUDA_COLOR_CUH
