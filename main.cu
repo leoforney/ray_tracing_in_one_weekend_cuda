@@ -100,7 +100,7 @@ int main() {
 
     const int numXPixels = 1200;
     const int numYPixels = 600;
-    const int numRays = 8;
+    const int numRays = 200;
     const int tilesX = 8;
     const int tilesY = 8;
     const int tilesZ = 8;
@@ -113,6 +113,8 @@ int main() {
 
     vec3 *fb;
     checkCudaErrors(cudaMallocManaged((void **)&fb, fb_size));
+    checkCudaErrors(cudaMemset(fb, 0, fb_size));
+
 
     curandState *d_rand_state;
     checkCudaErrors(cudaMalloc((void **)&d_rand_state, num_pixels * numRays * sizeof(curandState)));
@@ -140,6 +142,8 @@ int main() {
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
 
+    blocks = dim3(numXPixels / tilesX + 1, numYPixels / tilesY + 1);
+    threads = dim3(tilesX, tilesY);
     accumulate_samples<<<blocks, threads>>>(fb, numXPixels, numYPixels, numRays);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());

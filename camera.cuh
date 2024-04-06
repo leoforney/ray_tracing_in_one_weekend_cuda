@@ -113,9 +113,9 @@ __global__ static void render(vec3 *fb, int max_x, int max_y, int numRays, camer
     ray r = (*cam)->get_ray(u, v, &local_rand_state);
     col = camera::ray_color(r, world, &local_rand_state);
 
-    atomicAdd(&(fb[pixel_index].e[0]), col.r() / float(numRays));
-    atomicAdd(&(fb[pixel_index].e[1]), col.g() / float(numRays));
-    atomicAdd(&(fb[pixel_index].e[2]), col.b() / float(numRays));
+    atomicAdd(&(fb[pixel_index].e[0]), col.r());
+    atomicAdd(&(fb[pixel_index].e[1]), col.g());
+    atomicAdd(&(fb[pixel_index].e[2]), col.b());
 }
 
 __global__ static void accumulate_samples(color *fb, int max_x, int max_y, int numRays) {
@@ -127,9 +127,9 @@ __global__ static void accumulate_samples(color *fb, int max_x, int max_y, int n
 
     color col = fb[pixel_index];
 
-    col[0] = linear_to_gamma(col[0]);
-    col[1] = linear_to_gamma(col[1]);
-    col[2] = linear_to_gamma(col[2]);
+    col[0] = linear_to_gamma(col[0] / float(numRays));
+    col[1] = linear_to_gamma(col[1] / float(numRays));
+    col[2] = linear_to_gamma(col[2] / float(numRays));
     fb[pixel_index] = col;
 }
 
